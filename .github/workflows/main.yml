@@ -9,10 +9,6 @@ on:
 jobs:
   deploy:
     runs-on: ubuntu-latest
-    permissions:
-      id-token: write
-      contents: read
-    
     steps:
       - uses: actions/checkout@v3
       
@@ -51,10 +47,13 @@ jobs:
             aws ecr get-login-password --region ${{ secrets.AWS_REGION }} | docker login --username AWS --password-stdin ${{ secrets.ECR_REGISTRY }} &&
             echo 'Pulling new image...' &&
             docker pull ${{ secrets.ECR_REGISTRY }}/fastapi-app:latest &&
-            echo 'Stopping old container...' &&
-            docker stop fastapi-app || true &&
-            docker rm fastapi-app || true &&
+            echo 'Ensuring no containers are running...' &&
+            docker stop \$(docker ps -q) || true &&
+            docker rm \$(docker ps -a -q) || true &&
             echo 'Starting new container...' &&
             docker run -d --name fastapi-app -p 8000:8000 ${{ secrets.ECR_REGISTRY }}/fastapi-app:latest &&
+            echo 'Verifying deployment...' &&
+            sleep 5 &&
+            curl -s localhost:8000/docs | grep 'FastAPI' &&
             echo 'Deployment complete!'
           "
